@@ -87,6 +87,7 @@ func run(ctx context.Context, cfg signal.Config, executor signal.Executor, publi
 		InstanceID:     instanceID,
 		Status:         status,
 		PublishTimeout: cfg.PublishTimeout,
+		Retries:        cfg.Retries,
 	}
 
 	if err := publisher.Publish(ctx, publishInput); err != nil {

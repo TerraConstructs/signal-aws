@@ -11,6 +11,7 @@ type PublishInput struct {
 	InstanceID     string
 	Status         string
 	PublishTimeout time.Duration
+	Retries        int
 }
 
 type Publisher interface {

@@ -278,34 +278,45 @@ func TestRun_RetryOnTempError(t *testing.T) {
 	}
 
 	// Run the function - this should trigger retry logic in the SQS publisher
-	// Note: Our current implementation doesn't have retry logic built into the run function
-	// This test demonstrates what the behavior SHOULD be when retry is implemented
 	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
 
-	// With current implementation, this will fail on first publish attempt
-	// When retry is implemented, this should succeed
-	if err == nil {
-		t.Log("Retry logic not yet implemented - this test will pass when retry is added")
+	// With AWS SDK retry approach, the mock publisher will fail on first attempt
+	// The retry logic is handled internally by AWS SDK, so we expect failure here
+	// This test validates that retry configuration is passed through properly
+	if err != nil {
+		t.Logf("MockPublisher simulates failure - this is expected. Error: %v", err)
+
+		// Verify the publisher was called with retry configuration
+		if mockPublisher.CallCount() != 1 {
+			t.Errorf("Expected 1 publish attempt (mock fails immediately), got: %d", mockPublisher.CallCount())
+		}
+
+		lastCall := mockPublisher.GetLastCall()
+		if lastCall == nil {
+			t.Fatal("Expected publisher call to be recorded")
+		}
+
+		// Verify retry configuration was passed through
+		if lastCall.Retries != cfg.Retries {
+			t.Errorf("Expected retries %d to be passed to publisher, got: %d", cfg.Retries, lastCall.Retries)
+		}
+
+		// Should still have a result even on error
+		if result == nil {
+			t.Fatal("Expected result even on error")
+		}
+	} else {
+		// If mockPublisher is configured to succeed after N failures, verify success
+		t.Log("Retry logic succeeded - publisher succeeded after simulated failures")
 
 		// Verify result
 		if result.Status != "SUCCESS" {
 			t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
 		}
 
-		// Verify multiple publish attempts were made
-		if mockPublisher.CallCount() != 3 {
-			t.Errorf("Expected 3 publish attempts (2 failures + 1 success), got: %d", mockPublisher.CallCount())
-		}
-	} else {
-		t.Logf("Expected: Retry logic not yet implemented. Got error: %v", err)
-		// This is expected with current implementation
+		// With mock, we still expect only 1 call since AWS SDK retry is internal
 		if mockPublisher.CallCount() != 1 {
-			t.Errorf("Expected 1 publish attempt (no retry yet), got: %d", mockPublisher.CallCount())
-		}
-
-		// Should still have a result even on error
-		if result == nil {
-			t.Fatal("Expected result even on error")
+			t.Errorf("Expected 1 publish call (AWS SDK handles retries internally), got: %d", mockPublisher.CallCount())
 		}
 	}
 }

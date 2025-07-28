@@ -62,3 +62,13 @@ test-fixtures: build ## Test binary with fixture scripts
 # Show help flags
 usage: build ## Show binary usage
 	./tcons-signal --help
+
+# Integration testing with ElasticMQ and EC2 metadata mock
+integration-up: ## Start integration test environment
+	go run ./test/helpers.go up
+
+integration-down: ## Stop integration test environment
+	go run ./test/helpers.go down
+
+integration-test: ## Run full integration test suite
+	go run ./test/helpers.go test

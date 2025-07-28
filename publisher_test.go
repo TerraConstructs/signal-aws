@@ -16,6 +16,7 @@ func TestMockPublisher_Basic(t *testing.T) {
 		InstanceID:     "i-1234567890abcdef0",
 		Status:         "SUCCESS",
 		PublishTimeout: 10 * time.Second,
+		Retries:        3,
 	}
 
 	// Test successful publish
@@ -47,12 +48,14 @@ func TestMockPublisher_GetLastCall(t *testing.T) {
 		QueueURL: "queue1",
 		SignalID: "signal1",
 		Status:   "SUCCESS",
+		Retries:  3,
 	}
 
 	input2 := PublishInput{
 		QueueURL: "queue2",
 		SignalID: "signal2",
 		Status:   "FAILURE",
+		Retries:  5,
 	}
 
 	// Make first call
@@ -87,6 +90,7 @@ func TestMockPublisher_SetError(t *testing.T) {
 		QueueURL: "test-queue",
 		SignalID: "test-signal",
 		Status:   "SUCCESS",
+		Retries:  3,
 	}
 
 	err := mock.Publish(context.Background(), input)
@@ -110,6 +114,7 @@ func TestMockPublisher_RetryLogic(t *testing.T) {
 		QueueURL: "test-queue",
 		SignalID: "test-signal",
 		Status:   "SUCCESS",
+		Retries:  3,
 	}
 
 	// First call should fail
@@ -149,6 +154,7 @@ func TestMockPublisher_MessageAttributes(t *testing.T) {
 		InstanceID:     "i-0123456789abcdef0",
 		Status:         "FAILURE",
 		PublishTimeout: 5 * time.Second,
+		Retries:        2,
 	}
 
 	err := mock.Publish(context.Background(), input)
@@ -180,6 +186,10 @@ func TestMockPublisher_MessageAttributes(t *testing.T) {
 
 	if lastCall.PublishTimeout != input.PublishTimeout {
 		t.Errorf("Expected PublishTimeout %v, got %v", input.PublishTimeout, lastCall.PublishTimeout)
+	}
+
+	if lastCall.Retries != input.Retries {
+		t.Errorf("Expected Retries %d, got %d", input.Retries, lastCall.Retries)
 	}
 }
 
@@ -244,6 +254,7 @@ func TestPublishInput_Struct(t *testing.T) {
 		InstanceID:     "i-1234567890abcdef0",
 		Status:         "SUCCESS",
 		PublishTimeout: 10 * time.Second,
+		Retries:        3,
 	}
 
 	// Verify all fields are set
@@ -262,6 +273,9 @@ func TestPublishInput_Struct(t *testing.T) {
 	if input.PublishTimeout == 0 {
 		t.Error("PublishTimeout should not be zero")
 	}
+	if input.Retries < 0 {
+		t.Error("Retries should not be negative")
+	}
 }
 
 // Note: We cannot easily test SQSPublisher without real AWS credentials
@@ -278,5 +292,43 @@ func TestSQSPublisher_Creation(t *testing.T) {
 	verbosePublisher := NewSQSPublisher(true)
 	if verbosePublisher == nil {
 		t.Error("Expected verbose SQSPublisher instance, got nil")
+	}
+}
+
+func TestMockPublisher_RetryConfiguration(t *testing.T) {
+	mock := NewMockPublisher()
+
+	testCases := []struct {
+		name    string
+		retries int
+	}{
+		{"Default retries", 3},
+		{"No retries", 0},
+		{"High retries", 10},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := PublishInput{
+				QueueURL: "test-queue",
+				SignalID: "test-signal",
+				Status:   "SUCCESS",
+				Retries:  tc.retries,
+			}
+
+			err := mock.Publish(context.Background(), input)
+			if err != nil {
+				t.Errorf("Expected no error, got: %v", err)
+			}
+
+			lastCall := mock.GetLastCall()
+			if lastCall == nil {
+				t.Fatal("Expected call to be recorded")
+			}
+
+			if lastCall.Retries != tc.retries {
+				t.Errorf("Expected retries %d, got %d", tc.retries, lastCall.Retries)
+			}
+		})
 	}
 }
