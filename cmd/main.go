@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/terraconstructs/tcons-signal"
+	"github.com/terraconstructs/signal-aws"
 	"go.uber.org/zap"
 )
 
@@ -83,10 +83,18 @@ func run(ctx context.Context, cfg signal.Config, executor signal.Executor, publi
 
 	result.Status = status
 
-	// Get instance ID from IMDS
-	instanceID, err := imdsClient.GetInstanceID(ctx)
-	if err != nil {
-		return result, fmt.Errorf("failed to get instance ID: %w", err)
+	// Get instance ID - use provided value or fetch from IMDS
+	var instanceID string
+	if cfg.InstanceID != "" {
+		instanceID = cfg.InstanceID
+		logger.Debug("Using provided instance ID", zap.String("instance_id", instanceID))
+	} else {
+		var err error
+		instanceID, err = imdsClient.GetInstanceID(ctx)
+		if err != nil {
+			return result, fmt.Errorf("failed to get instance ID: %w", err)
+		}
+		logger.Debug("Fetched instance ID from IMDS", zap.String("instance_id", instanceID))
 	}
 
 	// Publish signal

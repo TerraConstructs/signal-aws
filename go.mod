@@ -1,4 +1,4 @@
-module github.com/terraconstructs/tcons-signal
+module github.com/terraconstructs/signal-aws
 
 go 1.24.4
 

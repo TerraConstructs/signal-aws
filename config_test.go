@@ -16,7 +16,7 @@ func TestParseConfig_Success(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--id", "test-signal-123",
 		"--exec", "echo hello",
@@ -73,7 +73,7 @@ func TestParseConfig_MissingQueueURL(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--id", "test-signal-123",
 		"--exec", "echo hello",
 	}
@@ -96,7 +96,7 @@ func TestParseConfig_MissingID(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--exec", "echo hello",
 	}
@@ -119,7 +119,7 @@ func TestParseConfig_MissingExecAndStatus(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--id", "test-signal-123",
 	}
@@ -142,7 +142,7 @@ func TestParseConfig_InvalidStatus(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--id", "test-signal-123",
 		"--status", "INVALID",
@@ -170,7 +170,7 @@ func TestParseConfig_ValidStatus(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 			os.Args = []string{
-				"tcons-signal",
+				"tcsignal-aws",
 				"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 				"--id", "test-signal-123",
 				"--status", status,
@@ -196,7 +196,7 @@ func TestParseConfig_ShortFlags(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"-u", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"-i", "test-signal-123",
 		"-e", "echo hello",
@@ -229,7 +229,7 @@ func TestParseConfig_Defaults(t *testing.T) {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 
 	os.Args = []string{
-		"tcons-signal",
+		"tcsignal-aws",
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--id", "test-signal-123",
 		"--exec", "echo hello",

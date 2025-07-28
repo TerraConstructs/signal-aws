@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: signal-aws
+
+builds:
+  - id: tcsignal-aws
+    dir: .
+    main: ./cmd
+    binary: tcsignal-aws
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - id: tcsignal-aws
+    name_template: >-
+      {{- .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: ['zip']
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: "🚀 New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "📚 Documentation Updates"
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "🔧 Other Changes"
+      order: 999
+
+release:
+  github:
+    owner: terraconstructs
+    name: signal-aws
+  draft: false
+  prerelease: auto
+  mode: append
+  header: |
+    ## tcsignal-aws {{.Tag}}
+    
+    A lightweight CLI binary that enables CloudFormation-style signaling for Terraform deployments via AWS SQS.
+    
+    ### Installation
+    
+    Download the appropriate binary for your platform from the assets below.
+    
+    ```bash
+    # Linux x86_64
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/signal-aws_Linux_x86_64.tar.gz" | tar xz
+    chmod +x tcsignal-aws
+    sudo mv tcsignal-aws /usr/local/bin/
+    
+    # Linux ARM64
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/signal-aws_Linux_arm64.tar.gz" | tar xz
+    chmod +x tcsignal-aws
+    sudo mv tcsignal-aws /usr/local/bin/
+    
+    # macOS x86_64
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/signal-aws_Darwin_x86_64.tar.gz" | tar xz
+    chmod +x tcsignal-aws
+    sudo mv tcsignal-aws /usr/local/bin/
+    
+    # macOS ARM64 (Apple Silicon)
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/signal-aws_Darwin_arm64.tar.gz" | tar xz
+    chmod +x tcsignal-aws
+    sudo mv tcsignal-aws /usr/local/bin/
+    
+    # Windows x86_64
+    # Download signal-aws_Windows_x86_64.zip and extract tcsignal-aws.exe
+    
+    # Windows ARM64
+    # Download signal-aws_Windows_arm64.zip and extract tcsignal-aws.exe
+    ```
+    
+    ### Checksum Verification
+    
+    All release binaries include SHA256 checksums for security verification:
+    
+    ```bash
+    # Download checksums file
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/checksums.txt" -o checksums.txt
+    
+    # Verify Linux x86_64 binary (example)
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/download/{{.Tag}}/signal-aws_Linux_x86_64.tar.gz" -o signal-aws_Linux_x86_64.tar.gz
+    sha256sum -c checksums.txt --ignore-missing
+    
+    # macOS verification
+    shasum -a 256 -c checksums.txt --ignore-missing
+    
+    # Windows PowerShell verification
+    # Get-FileHash signal-aws_Windows_x86_64.zip -Algorithm SHA256
+    # Compare with checksums.txt
+    ```
+  footer: |
+    **Full Changelog**: https://github.com/terraconstructs/signal-aws/compare/{{.PreviousTag}}...{{.Tag}}
+    
+    ---
+    
+    For support and documentation, visit: https://github.com/terraconstructs/signal-aws

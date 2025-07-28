@@ -12,6 +12,7 @@ type Config struct {
 	ID             string
 	Exec           string
 	Status         string
+	InstanceID     string
 	Retries        int
 	PublishTimeout time.Duration
 	Timeout        time.Duration
@@ -30,6 +31,8 @@ func ParseConfig() (*Config, error) {
 	flag.StringVar(&cfg.Exec, "e", "", "run this command and signal based on its exit code")
 	flag.StringVar(&cfg.Status, "status", "", "shortcut: send SUCCESS or FAILURE without exec")
 	flag.StringVar(&cfg.Status, "s", "", "shortcut: send SUCCESS or FAILURE without exec")
+	flag.StringVar(&cfg.InstanceID, "instance-id", "", "override instance ID (default: fetch from IMDS)")
+	flag.StringVar(&cfg.InstanceID, "n", "", "override instance ID (default: fetch from IMDS)")
 	flag.IntVar(&cfg.Retries, "retries", 3, "transient-error retries")
 	flag.DurationVar(&cfg.PublishTimeout, "publish-timeout", 10*time.Second, "timeout per SendMessage")
 	flag.DurationVar(&cfg.Timeout, "timeout", 30*time.Second, "total operation timeout")
@@ -38,13 +41,14 @@ func ParseConfig() (*Config, error) {
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `USAGE:
-  tcons-signal [flags]
+  tcsignal-aws [flags]
 
 FLAGS:
   -u, --queue-url string     (required) SQS queue URL
   -i, --id string            (required) unique signal ID for the deployment
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
+  -n, --instance-id string   override instance ID (default: fetch from IMDS)
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)

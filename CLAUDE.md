@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`tcons-signal` is a Go CLI binary that enables CloudFormation-style signaling for Terraform deployments via AWS SQS. It acts as a bridge between EC2 instance initialization and Terraform orchestration, allowing instances to signal their readiness status back to Terraform through SQS messages.
+`signal-aws` is a Go CLI binary that enables CloudFormation-style signaling for Terraform deployments via AWS SQS. It acts as a bridge between EC2 instance initialization and Terraform orchestration, allowing instances to signal their readiness status back to Terraform through SQS messages.
 
 ## Development Commands
 

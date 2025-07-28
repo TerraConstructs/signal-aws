@@ -30,4 +30,4 @@ services:
 
 networks:
   default:
-    name: tcons-signal-test
+    name: tcsignal-aws-test

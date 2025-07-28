@@ -1,15 +1,15 @@
-# tcons-signal
+# signal-aws
 
 A lightweight CLI binary that enables CloudFormation-style signaling for Terraform deployments via AWS SQS.
 
 ## Overview
 
-`tcons-signal` bridges the gap between Terraform's infrastructure provisioning and application readiness by providing a CloudFormation `cfn-signal` equivalent for Terraform. It allows EC2 instances to signal their configuration status back to Terraform through SQS messages, enabling true infrastructure-application synchronization.
+`signal-aws` bridges the gap between Terraform's infrastructure provisioning and application readiness by providing a CloudFormation `cfn-signal` equivalent for Terraform. It allows EC2 instances to signal their configuration status back to Terraform through SQS messages, enabling true infrastructure-application synchronization.
 
 ### How it fits in the ecosystem
 
 - **Terraform Provider**: Waits for signals via SQS polling (separate component)
-- **tcons-signal Binary**: Runs on EC2 instances to send readiness signals
+- **signal-aws Binary**: Runs on EC2 instances to send readiness signals
 - **AWS SQS**: Message transport layer between instances and Terraform
 
 ## Quick Start
@@ -17,8 +17,9 @@ A lightweight CLI binary that enables CloudFormation-style signaling for Terrafo
 ### Installation
 ```bash
 # Download and install
-curl -L https://github.com/your-org/tcons-signal/releases/latest/download/tcons-signal-linux-amd64 -o /usr/local/bin/tcons-signal
-chmod +x /usr/local/bin/tcons-signal
+curl -L https://github.com/terraconstructs/signal-aws/releases/latest/download/signal-aws_Linux_x86_64.tar.gz | tar xz
+chmod +x tcsignal-aws
+sudo mv tcsignal-aws /usr/local/bin/
 
 # Or build from source
 make build
@@ -28,12 +29,12 @@ make build
 
 ```bash
 # Signal success after running a command
-tcons-signal --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
+tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
              --id deployment-123 \
              --exec "./install-app.sh"
 
 # Manual status signaling
-tcons-signal --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
+tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
              --id deployment-123 \
              --status SUCCESS
 ```
@@ -46,12 +47,13 @@ resource "aws_instance" "web" {
   
   user_data = <<-EOD
     #!/bin/bash
-    # Download and install tcons-signal
-    curl -L https://releases.example.com/tcons-signal -o /usr/local/bin/tcons-signal
-    chmod +x /usr/local/bin/tcons-signal
+    # Download and install signal-aws
+    curl -L "https://github.com/terraconstructs/signal-aws/releases/latest/download/signal-aws_Linux_x86_64.tar.gz" | tar xz
+    chmod +x tcsignal-aws
+    sudo mv tcsignal-aws /usr/local/bin/
     
     # Run application setup and signal completion
-    /usr/local/bin/tcons-signal \
+    /usr/local/bin/tcsignal-aws \
       --queue-url "${aws_sqs_queue.signals.url}" \
       --id "${local.deployment_id}" \
       --exec "./setup-application.sh"
@@ -69,7 +71,6 @@ resource "tconsaws_signal" "web_ready" {
 
 ## Features
 
-### ✅ Phase 1 (Current)
 - **CLI Interface**: Full flag parsing with validation
 - **Command Execution**: Wraps user commands and captures exit codes  
 - **AWS Integration**: IMDS instance ID fetching + SQS publishing
@@ -79,20 +80,18 @@ resource "tconsaws_signal" "web_ready" {
 - **Structured Logging**: JSON/console format with observability integration
 - **Integration Testing**: Local ElasticMQ testing setup
 
-### 🔄 Phase 2 (Planned)
-- **Enhanced Timeouts**: Per-operation and overall timeout controls
-
 ## CLI Reference
 
 ```
 USAGE:
-  tcons-signal [flags]
+  tcsignal-aws [flags]
 
 FLAGS:
   -u, --queue-url string     (required) SQS queue URL
   -i, --id string            (required) unique signal ID for the deployment
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
+  -n, --instance-id string   override instance ID (default: fetch from IMDS)
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)
@@ -100,6 +99,49 @@ FLAGS:
   --log-level string         log level: debug, info, warn, or error (default "info")
   --help                     show usage
 ```
+
+## Local Testing & Development
+
+### Testing Without EC2/IMDS
+
+When developing or testing outside of EC2 environments, use the `--instance-id` flag to bypass IMDS:
+
+```bash
+# Test locally without IMDS dependency
+tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
+             --id test-signal-123 \
+             --status SUCCESS \
+             --instance-id i-local-test-12345
+
+# Test with command execution
+tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
+             --id test-signal-456 \
+             --exec "./my-test-script.sh" \
+             --instance-id i-local-test-67890
+```
+
+### Integration Testing
+
+Run the full integration test suite with local ElasticMQ and EC2 metadata mock:
+
+```bash
+# Start local test environment
+make integration-up
+
+# Run integration tests
+make integration-test
+
+# Stop test environment
+make integration-down
+
+# Or run the complete workflow in one command
+make integration-test  # (automatically starts and stops environment)
+```
+
+The integration environment provides:
+- **ElasticMQ**: Local SQS-compatible message queue
+- **EC2 Metadata Mock**: Simulates AWS IMDS responses
+- **End-to-end testing**: Validates complete binary workflow
 
 ## Tech Stack
 

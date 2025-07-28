@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/terraconstructs/tcons-signal"
+	"github.com/terraconstructs/signal-aws"
 )
 
 // Helper function to create a test logger
@@ -20,14 +20,14 @@ func createTestLogger() signal.Logger {
 // TestBinaryExists ensures the binary can be built and shows help
 func TestBinaryExists(t *testing.T) {
 	// Test that the binary can be built
-	cmd := exec.Command("go", "build", "-o", "tcons-signal-test", ".")
+	cmd := exec.Command("go", "build", "-o", "tcsignal-aws-test", ".")
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("tcons-signal-test")
+	defer os.Remove("tcsignal-aws-test")
 
 	// Test help output
-	cmd = exec.Command("./tcons-signal-test", "--help")
+	cmd = exec.Command("./tcsignal-aws-test", "--help")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Failed to run help command: %v", err)
@@ -38,7 +38,7 @@ func TestBinaryExists(t *testing.T) {
 	}
 
 	// Test basic validation
-	cmd = exec.Command("./tcons-signal-test")
+	cmd = exec.Command("./tcsignal-aws-test")
 	_, err = cmd.Output()
 	if err == nil {
 		t.Fatal("Expected error for missing required flags")
@@ -471,6 +471,123 @@ func TestRun_InvalidExec(t *testing.T) {
 
 	if lastCall.Status != "FAILURE" {
 		t.Errorf("Expected status 'FAILURE', got: %s", lastCall.Status)
+	}
+}
+
+// Test that provided instance ID is used instead of IMDS
+func TestRun_ProvidedInstanceID(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	// Don't set up IMDS mock - it should not be called
+
+	// Create config with provided instance ID
+	providedInstanceID := "i-provided123456789"
+	cfg := signal.Config{
+		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+		ID:             "test-signal-provided-id",
+		Exec:           "echo success",
+		InstanceID:     providedInstanceID, // Provide instance ID directly
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for provided instance ID, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS was NOT called
+	if mockIMDS.CallCount() != 0 {
+		t.Errorf("Expected IMDS NOT to be called when instance ID provided, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify executor was called
+	if mockExecutor.CallCount() != 1 {
+		t.Errorf("Expected executor to be called once, got: %d", mockExecutor.CallCount())
+	}
+
+	// Verify publisher was called with provided instance ID
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.InstanceID != providedInstanceID {
+		t.Errorf("Expected instance ID '%s', got: %s", providedInstanceID, lastCall.InstanceID)
+	}
+
+	if lastCall.Status != "SUCCESS" {
+		t.Errorf("Expected status 'SUCCESS', got: %s", lastCall.Status)
+	}
+}
+
+// Test that IMDS is still called when no instance ID is provided (existing behavior)
+func TestRun_IMDSUsedWhenNoInstanceIDProvided(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	imdsInstanceID := "i-imds123456789abcdef"
+	mockIMDS.SetInstanceID(imdsInstanceID)
+
+	// Create config WITHOUT provided instance ID
+	cfg := signal.Config{
+		QueueURL: "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+		ID:       "test-signal-imds",
+		Exec:     "echo success",
+		// InstanceID is empty - should use IMDS
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for IMDS usage, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS WAS called
+	if mockIMDS.CallCount() != 1 {
+		t.Errorf("Expected IMDS to be called once when no instance ID provided, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify publisher was called with IMDS instance ID
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.InstanceID != imdsInstanceID {
+		t.Errorf("Expected instance ID from IMDS '%s', got: %s", imdsInstanceID, lastCall.InstanceID)
 	}
 }
 

@@ -4,7 +4,8 @@
 *.dll
 *.so
 *.dylib
-tcons-signal
+tcsignal-aws
+dist
 
 # Test binary, built with `go test -c`
 *.test

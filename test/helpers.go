@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/terraconstructs/tcons-signal/test/integration"
+	"github.com/terraconstructs/signal-aws/test/integration"
 )
 
 func main() {

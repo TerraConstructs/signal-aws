@@ -14,13 +14,13 @@ import (
 func StartEnvironment() error {
 	fmt.Println("Starting integration test environment...")
 
-	// Start docker-compose
+	// Start docker compose
 	fmt.Println("Starting ElasticMQ and EC2 metadata mock...")
-	cmd := exec.Command("docker-compose", "up", "-d")
+	cmd := exec.Command("docker", "compose", "up", "-d")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to start docker-compose: %v", err)
+		return fmt.Errorf("failed to start docker compose: %v", err)
 	}
 
 	// Wait for ElasticMQ to be ready
@@ -45,12 +45,12 @@ func StartEnvironment() error {
 func StopEnvironment() error {
 	fmt.Println("Stopping integration test environment...")
 
-	// Stop docker-compose
-	cmd := exec.Command("docker-compose", "down")
+	// Stop docker compose
+	cmd := exec.Command("docker", "compose", "down")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to stop docker-compose: %v", err)
+		return fmt.Errorf("failed to stop docker compose: %v", err)
 	}
 
 	fmt.Println("✅ Integration test environment stopped!")
@@ -62,8 +62,8 @@ func RunFullTest() error {
 	fmt.Println("Running full integration test suite...")
 
 	// Build the binary first
-	fmt.Println("Building tcons-signal binary...")
-	if err := RunCommand("go", "build", "-o", "tcons-signal", "./cmd"); err != nil {
+	fmt.Println("Building tcsignal-aws binary...")
+	if err := RunCommand("go", "build", "-o", "tcsignal-aws", "./cmd"); err != nil {
 		return fmt.Errorf("failed to build binary: %v", err)
 	}
 	fmt.Println("✅ Binary built successfully!")

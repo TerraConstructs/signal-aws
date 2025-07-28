@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Logger interface defines the logging contract for tcons-signal
+// Logger interface defines the logging contract for tcsignal-aws
 type Logger interface {
 	Debug(msg string, fields ...zap.Field)
 	Info(msg string, fields ...zap.Field)
@@ -51,7 +51,7 @@ func NewLogger(format string, level string) (Logger, error) {
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 		config.EncoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 		config.InitialFields = map[string]interface{}{
-			"component": "tcons-signal",
+			"component": "tcsignal-aws",
 		}
 		logger, err = config.Build()
 	} else if format == "console" {
@@ -64,7 +64,7 @@ func NewLogger(format string, level string) (Logger, error) {
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 		config.InitialFields = map[string]interface{}{
-			"component": "tcons-signal",
+			"component": "tcsignal-aws",
 		}
 		logger, err = config.Build()
 	} else {

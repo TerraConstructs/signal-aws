@@ -43,7 +43,7 @@ func (p *SQSPublisher) Publish(ctx context.Context, input PublishInput) error {
 
 	sqsInput := &sqs.SendMessageInput{
 		QueueUrl:    aws.String(input.QueueURL),
-		MessageBody: aws.String("tcons-signal message"),
+		MessageBody: aws.String("tcsignal-aws message"),
 		MessageAttributes: map[string]types.MessageAttributeValue{
 			"signal_id": {
 				DataType:    aws.String("String"),

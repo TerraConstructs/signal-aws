@@ -15,8 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
-	"github.com/terraconstructs/tcons-signal"
-	"github.com/terraconstructs/tcons-signal/test/integration"
+	"github.com/terraconstructs/signal-aws"
+	"github.com/terraconstructs/signal-aws/test/integration"
 )
 
 const (
@@ -126,7 +126,7 @@ func TestSQSPublisher_Integration_ElasticMQPublish(t *testing.T) {
 	// Manually test the SQS message format that our SQSPublisher would send
 	sqsInput := &sqs.SendMessageInput{
 		QueueUrl:    aws.String(input.QueueURL),
-		MessageBody: aws.String("tcons-signal message"),
+		MessageBody: aws.String("tcsignal-aws message"),
 		MessageAttributes: map[string]types.MessageAttributeValue{
 			"signal_id": {
 				DataType:    aws.String("String"),
@@ -189,7 +189,7 @@ func TestSQSPublisher_Integration_WithElasticMQClient(t *testing.T) {
 	// Test direct SQS publishing (this bypasses our SQSPublisher for now)
 	testMessage := &sqs.SendMessageInput{
 		QueueUrl:    aws.String(queueURL),
-		MessageBody: aws.String("tcons-signal message"),
+		MessageBody: aws.String("tcsignal-aws message"),
 		MessageAttributes: map[string]types.MessageAttributeValue{
 			"signal_id": {
 				DataType:    aws.String("String"),
@@ -246,37 +246,118 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 	purgeQueue(t, queueURL)
 
 	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcons-signal"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcons-signal", ".")
+	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
 	}
 
-	// Run the binary with ElasticMQ queue URL (without IMDS mock)
-	// Note: This will fail because the binary tries to get instance ID from IMDS
-	cmd := exec.Command("./tcons-signal",
+	// Test 1: Run without IMDS and without --instance-id (should fail)
+	t.Log("🔄 Testing binary without IMDS and without --instance-id (expected to fail)...")
+	cmd1 := exec.Command("./tcsignal-aws",
 		"--queue-url", queueURL,
-		"--id", "integration-binary-test-no-imds",
+		"--id", "integration-binary-test-no-imds-no-flag",
 		"--status", "SUCCESS",
-		"--verbose",
 	)
 
-	output, err := cmd.CombinedOutput()
-	t.Logf("Binary output: %s", string(output))
+	// Explicitly avoid setting AWS_EC2_METADATA_SERVICE_ENDPOINT to force real IMDS lookup
+	cmd1.Env = append(os.Environ(),
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_REGION=us-east-1",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+	)
 
-	// We expect this to fail due to IMDS not being available
-	if err != nil {
-		t.Logf("Expected error due to IMDS not available: %v", err)
+	output1, err1 := cmd1.CombinedOutput()
+	t.Logf("Binary output (no IMDS, no flag): %s", string(output1))
 
-		// Check if the error mentions IMDS (which means we got past queue URL validation)
-		outputStr := string(output)
-		if contains(outputStr, "instance-id") || contains(outputStr, "imds") || contains(outputStr, "169.254.169.254") {
-			t.Log("Success: Binary got to IMDS step, meaning queue URL and config parsing worked")
+	// Check the behavior - it might succeed if IMDS mock is accessible or fail if not
+	if err1 != nil {
+		t.Logf("✅ Binary failed as expected when IMDS not configured: %v", err1)
+
+		// Check if the error mentions IMDS or instance ID (which means we got past queue URL validation)
+		outputStr := string(output1)
+		if contains(outputStr, "instance") || contains(outputStr, "imds") || contains(outputStr, "169.254.169.254") {
+			t.Log("✅ Binary got to IMDS step, meaning queue URL and config parsing worked")
 		} else {
 			t.Errorf("Unexpected error - binary may have failed before reaching IMDS: %s", outputStr)
 		}
+	} else {
+		// If it succeeded, it means IMDS mock was accessible (which is fine in integration environment)
+		t.Log("✅ Binary succeeded - IMDS mock was accessible (this is fine in integration environment)")
+		
+		// Verify it used an instance ID from IMDS
+		outputStr := string(output1)
+		if contains(outputStr, "Fetched instance ID from IMDS") {
+			t.Log("✅ Binary correctly fetched instance ID from IMDS mock")
+		}
 	}
+
+	// Test 2: Run without IMDS but WITH --instance-id (should succeed)
+	t.Log("🔄 Testing binary without IMDS but with --instance-id (should succeed)...")
+	providedInstanceID := "i-no-imds-workaround-789"
+	
+	cmd2 := exec.Command("./tcsignal-aws",
+		"--queue-url", queueURL,
+		"--id", "integration-binary-test-no-imds-with-flag",
+		"--status", "SUCCESS",
+		"--instance-id", providedInstanceID,
+		"--log-level", "debug",
+	)
+
+	cmd2.Env = append(os.Environ(),
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_REGION=us-east-1",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+	)
+
+	output2, err2 := cmd2.CombinedOutput()
+	t.Logf("Binary output (no IMDS, with flag): %s", string(output2))
+
+	if err2 != nil {
+		t.Errorf("Binary should succeed with --instance-id flag even without IMDS: %v", err2)
+		t.Errorf("Output: %s", string(output2))
+		return
+	}
+
+	t.Log("✅ Binary succeeded with --instance-id flag as IMDS workaround!")
+
+	// Verify the message was published correctly
+	messages := receiveMessages(t, queueURL, 10)
+	
+	// Should have 1 message (the successful one with --instance-id flag)
+	successMessages := 0
+	for _, msg := range messages {
+		if signalID, exists := msg.MessageAttributes["signal_id"]; exists &&
+			signalID.StringValue != nil &&
+			*signalID.StringValue == "integration-binary-test-no-imds-with-flag" {
+			successMessages++
+			
+			// Verify it has the correct instance ID
+			if instanceID, exists := msg.MessageAttributes["instance_id"]; exists &&
+				instanceID.StringValue != nil &&
+				*instanceID.StringValue == providedInstanceID {
+				t.Logf("✅ Message has correct provided instance ID: %s", providedInstanceID)
+			} else {
+				t.Errorf("Expected instance_id '%s', got %v", providedInstanceID, msg.MessageAttributes["instance_id"])
+			}
+		}
+	}
+	
+	if successMessages != 1 {
+		t.Errorf("Expected 1 successful message, found %d", successMessages)
+	}
+
+	// Verify the log output shows it used the provided instance ID
+	if contains(string(output2), "Using provided instance ID") {
+		t.Log("✅ Binary logged that it used the provided instance ID")
+	} else {
+		t.Error("Binary should have logged using provided instance ID")
+	}
+
+	t.Log("🎉 --instance-id flag successfully works as IMDS workaround!")
 }
 
 func TestBinary_Integration_WithIMDSMock(t *testing.T) {
@@ -289,19 +370,19 @@ func TestBinary_Integration_WithIMDSMock(t *testing.T) {
 	purgeQueue(t, queueURL)
 
 	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcons-signal"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcons-signal", ".")
+	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
 	}
 
 	// Run the binary with both ElasticMQ and IMDS mock
-	cmd := exec.Command("./tcons-signal",
+	cmd := exec.Command("./tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "integration-binary-test-with-imds",
 		"--exec", "../test/fixtures/success.sh",
-		"--verbose",
+		"--log-level", "debug",
 	)
 
 	// Set environment variables for AWS configuration
@@ -361,6 +442,242 @@ func TestBinary_Integration_WithIMDSMock(t *testing.T) {
 			t.Error("No messages found in SQS queue - signal may not have been published")
 		}
 	}
+}
+
+func TestBinary_Integration_WithProvidedInstanceID(t *testing.T) {
+	queueURL := getQueueURL(t, testQueueName)
+	purgeQueue(t, queueURL)
+
+	// Build the binary if it doesn't exist
+	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to build binary: %v", err)
+		}
+	}
+
+	providedInstanceID := "i-provided-integration-test-123"
+
+	// Run the binary with provided instance ID (bypassing IMDS)
+	cmd := exec.Command("./tcsignal-aws",
+		"--queue-url", queueURL,
+		"--id", "integration-binary-test-provided-instance-id",
+		"--exec", "../test/fixtures/success.sh",
+		"--instance-id", providedInstanceID,
+		"--log-level", "debug",
+	)
+
+	// Set environment variables for AWS configuration (SQS only, no IMDS endpoint)
+	cmd.Env = append(os.Environ(),
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_REGION=us-east-1",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+	)
+
+	output, err := cmd.CombinedOutput()
+	t.Logf("Binary output: %s", string(output))
+
+	if err != nil {
+		t.Errorf("Binary execution failed: %v", err)
+		t.Errorf("Output: %s", string(output))
+		return
+	}
+
+	// Binary succeeded! Let's verify the message was published with the provided instance ID
+	t.Log("✅ Binary executed successfully with provided instance ID!")
+
+	// Check if message was published to SQS
+	messages := receiveMessages(t, queueURL, 10)
+	if len(messages) == 0 {
+		t.Fatal("No messages found in SQS queue - signal was not published")
+	}
+
+	t.Logf("✅ Found %d message(s) in SQS queue", len(messages))
+
+	msg := messages[0]
+	t.Logf("Message attributes: %+v", msg.MessageAttributes)
+
+	// Verify expected attributes
+	if signalID, exists := msg.MessageAttributes["signal_id"]; exists &&
+		signalID.StringValue != nil &&
+		*signalID.StringValue == "integration-binary-test-provided-instance-id" {
+		t.Log("✅ Signal ID matches expected value")
+	} else {
+		t.Errorf("Expected signal_id 'integration-binary-test-provided-instance-id', got %v", msg.MessageAttributes["signal_id"])
+	}
+
+	if status, exists := msg.MessageAttributes["status"]; exists &&
+		status.StringValue != nil &&
+		*status.StringValue == "SUCCESS" {
+		t.Log("✅ Status matches expected value (SUCCESS)")
+	} else {
+		t.Errorf("Expected status 'SUCCESS', got %v", msg.MessageAttributes["status"])
+	}
+
+	// Most importantly, verify the instance ID is the one we provided
+	if instanceID, exists := msg.MessageAttributes["instance_id"]; exists &&
+		instanceID.StringValue != nil &&
+		*instanceID.StringValue == providedInstanceID {
+		t.Logf("✅ Instance ID matches provided value: %s", providedInstanceID)
+	} else {
+		t.Errorf("Expected instance_id '%s', got %v", providedInstanceID, msg.MessageAttributes["instance_id"])
+	}
+
+	// Verify the output shows it used the provided instance ID
+	outputStr := string(output)
+	if contains(outputStr, "Using provided instance ID") {
+		t.Log("✅ Binary logged that it used the provided instance ID")
+	} else if contains(outputStr, "Fetched instance ID from IMDS") {
+		t.Error("Binary should not have fetched from IMDS when instance ID was provided")
+	}
+}
+
+func TestBinary_Integration_ProvidedInstanceID_vs_IMDS(t *testing.T) {
+	// This test compares behavior with and without --instance-id flag
+	// It validates that both approaches work but use different instance IDs
+
+	// Check if EC2 metadata mock is available for IMDS test
+	if !isEC2MockAvailable() {
+		t.Skip("EC2 metadata mock not available - run 'make integration-up' first")
+	}
+
+	queueURL := getQueueURL(t, testQueueName)
+	purgeQueue(t, queueURL)
+
+	// Build the binary if it doesn't exist
+	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to build binary: %v", err)
+		}
+	}
+
+	providedInstanceID := "i-provided-comparison-test-456"
+
+	// Test 1: Run with provided instance ID
+	t.Log("🔄 Testing binary with provided instance ID...")
+	cmd1 := exec.Command("./tcsignal-aws",
+		"--queue-url", queueURL,
+		"--id", "comparison-test-provided-id",
+		"--status", "SUCCESS",
+		"--instance-id", providedInstanceID,
+		"--log-level", "debug",
+	)
+
+	cmd1.Env = append(os.Environ(),
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_REGION=us-east-1",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+	)
+
+	output1, err1 := cmd1.CombinedOutput()
+	t.Logf("Binary output (provided instance ID): %s", string(output1))
+
+	if err1 != nil {
+		t.Errorf("Binary execution failed with provided instance ID: %v", err1)
+	}
+
+	// Test 2: Run with IMDS (different signal ID to avoid conflicts)
+	t.Log("🔄 Testing binary with IMDS...")
+	cmd2 := exec.Command("./tcsignal-aws",
+		"--queue-url", queueURL,
+		"--id", "comparison-test-imds-id",
+		"--status", "SUCCESS",
+		"--log-level", "debug",
+	)
+
+	cmd2.Env = append(os.Environ(),
+		"AWS_EC2_METADATA_SERVICE_ENDPOINT=http://localhost:1338",
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_REGION=us-east-1",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+	)
+
+	output2, err2 := cmd2.CombinedOutput()
+	t.Logf("Binary output (IMDS): %s", string(output2))
+
+	if err2 != nil {
+		t.Errorf("Binary execution failed with IMDS: %v", err2)
+	}
+
+	// Verify both executions succeeded
+	if err1 != nil || err2 != nil {
+		return // Don't continue if either test failed
+	}
+
+	// Check messages in SQS - should have 2 messages
+	messages := receiveMessages(t, queueURL, 10)
+	if len(messages) != 2 {
+		t.Fatalf("Expected 2 messages in SQS queue, got %d", len(messages))
+	}
+
+	t.Log("✅ Both binary executions succeeded!")
+
+	// Organize messages by signal_id for comparison
+	var providedMessage, imdsMessage *types.Message
+
+	for i := range messages {
+		msg := &messages[i]
+		if signalID, exists := msg.MessageAttributes["signal_id"]; exists && signalID.StringValue != nil {
+			switch *signalID.StringValue {
+			case "comparison-test-provided-id":
+				providedMessage = msg
+			case "comparison-test-imds-id":
+				imdsMessage = msg
+			}
+		}
+	}
+
+	// Verify we found both messages
+	if providedMessage == nil {
+		t.Fatal("Could not find message from provided instance ID test")
+	}
+	if imdsMessage == nil {
+		t.Fatal("Could not find message from IMDS test")
+	}
+
+	// Verify provided instance ID message
+	if instanceID, exists := providedMessage.MessageAttributes["instance_id"]; exists &&
+		instanceID.StringValue != nil &&
+		*instanceID.StringValue == providedInstanceID {
+		t.Logf("✅ Provided instance ID message has correct instance ID: %s", providedInstanceID)
+	} else {
+		t.Errorf("Expected provided message to have instance_id '%s', got %v", providedInstanceID, providedMessage.MessageAttributes["instance_id"])
+	}
+
+	// Verify IMDS message has a different instance ID
+	if instanceID, exists := imdsMessage.MessageAttributes["instance_id"]; exists &&
+		instanceID.StringValue != nil {
+		imdsInstanceID := *instanceID.StringValue
+		t.Logf("✅ IMDS message has instance ID: %s", imdsInstanceID)
+
+		// Verify it's different from the provided one
+		if imdsInstanceID == providedInstanceID {
+			t.Error("IMDS instance ID should be different from provided instance ID")
+		} else {
+			t.Log("✅ IMDS and provided instance IDs are different as expected")
+		}
+	} else {
+		t.Error("IMDS message should have an instance_id attribute")
+	}
+
+	// Verify the log outputs show the correct behavior
+	if contains(string(output1), "Using provided instance ID") {
+		t.Log("✅ First execution logged using provided instance ID")
+	} else {
+		t.Error("First execution should have logged using provided instance ID")
+	}
+
+	if contains(string(output2), "Fetched instance ID from IMDS") {
+		t.Log("✅ Second execution logged fetching from IMDS")
+	} else {
+		t.Error("Second execution should have logged fetching from IMDS")
+	}
+
+	t.Log("🎉 Comparison test completed successfully!")
 }
 
 func isEC2MockAvailable() bool {

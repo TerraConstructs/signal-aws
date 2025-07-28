@@ -1,0 +1,31 @@
+{
+  "release-type": "go",
+  "packages": {
+    ".": {
+      "changelog-sections": [
+        {"type": "feat", "section": "Features"},
+        {"type": "fix", "section": "Bug Fixes"},
+        {"type": "perf", "section": "Performance Improvements"},
+        {"type": "deps", "section": "Dependencies"},
+        {"type": "docs", "section": "Documentation"},
+        {"type": "test", "section": "Testing"},
+        {"type": "ci", "section": "CI/CD"},
+        {"type": "refactor", "section": "Code Refactoring"},
+        {"type": "style", "section": "Styles"},
+        {"type": "chore", "section": "Miscellaneous"}
+      ],
+      "release-notes-config": {
+        "sections": [
+          {"type": "feat", "section": "🚀 Features"},
+          {"type": "fix", "section": "🐛 Bug Fixes"},
+          {"type": "perf", "section": "⚡ Performance Improvements"},
+          {"type": "deps", "section": "📦 Dependencies"},
+          {"type": "docs", "section": "📚 Documentation"},
+          {"type": "test", "section": "🧪 Testing"},
+          {"type": "ci", "section": "👷 CI/CD"},
+          {"type": "refactor", "section": "♻️ Code Refactoring"}
+        ]
+      }
+    }
+  }
+}
