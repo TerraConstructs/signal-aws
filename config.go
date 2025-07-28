@@ -12,10 +12,11 @@ type Config struct {
 	ID             string
 	Exec           string
 	Status         string
-	Verbose        bool
 	Retries        int
 	PublishTimeout time.Duration
 	Timeout        time.Duration
+	LogFormat      string
+	LogLevel       string
 }
 
 func ParseConfig() (*Config, error) {
@@ -29,11 +30,11 @@ func ParseConfig() (*Config, error) {
 	flag.StringVar(&cfg.Exec, "e", "", "run this command and signal based on its exit code")
 	flag.StringVar(&cfg.Status, "status", "", "shortcut: send SUCCESS or FAILURE without exec")
 	flag.StringVar(&cfg.Status, "s", "", "shortcut: send SUCCESS or FAILURE without exec")
-	flag.BoolVar(&cfg.Verbose, "verbose", false, "basic log verbosity")
-	flag.BoolVar(&cfg.Verbose, "v", false, "basic log verbosity")
 	flag.IntVar(&cfg.Retries, "retries", 3, "transient-error retries")
 	flag.DurationVar(&cfg.PublishTimeout, "publish-timeout", 10*time.Second, "timeout per SendMessage")
 	flag.DurationVar(&cfg.Timeout, "timeout", 30*time.Second, "total operation timeout")
+	flag.StringVar(&cfg.LogFormat, "log-format", "console", "log format: json or console")
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "log level: debug, info, warn, or error")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `USAGE:
@@ -44,10 +45,11 @@ FLAGS:
   -i, --id string            (required) unique signal ID for the deployment
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
-  -v, --verbose bool         basic log verbosity
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)
+  --log-format string        log format: json or console (default "console")
+  --log-level string         log level: debug, info, warn, or error (default "info")
   --help                     show usage
 `)
 	}
@@ -71,6 +73,16 @@ FLAGS:
 	// Validate --status values if provided
 	if cfg.Status != "" && cfg.Status != "SUCCESS" && cfg.Status != "FAILURE" {
 		return nil, fmt.Errorf("--status must be either SUCCESS or FAILURE")
+	}
+
+	// Validate --log-format values
+	if cfg.LogFormat != "json" && cfg.LogFormat != "console" {
+		return nil, fmt.Errorf("--log-format must be either json or console")
+	}
+
+	// Validate --log-level values
+	if cfg.LogLevel != "debug" && cfg.LogLevel != "info" && cfg.LogLevel != "warn" && cfg.LogLevel != "error" {
+		return nil, fmt.Errorf("--log-level must be one of: debug, info, warn, error")
 	}
 
 	return &cfg, nil

@@ -20,7 +20,8 @@ func TestParseConfig_Success(t *testing.T) {
 		"--queue-url", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"--id", "test-signal-123",
 		"--exec", "echo hello",
-		"--verbose",
+		"--log-level", "debug",
+		"--log-format", "json",
 		"--retries", "5",
 		"--publish-timeout", "15s",
 		"--timeout", "60s",
@@ -43,8 +44,12 @@ func TestParseConfig_Success(t *testing.T) {
 		t.Errorf("Expected Exec to be set correctly, got: %s", cfg.Exec)
 	}
 
-	if !cfg.Verbose {
-		t.Error("Expected Verbose to be true")
+	if cfg.LogLevel != "debug" {
+		t.Errorf("Expected LogLevel to be debug, got: %s", cfg.LogLevel)
+	}
+
+	if cfg.LogFormat != "json" {
+		t.Errorf("Expected LogFormat to be json, got: %s", cfg.LogFormat)
 	}
 
 	if cfg.Retries != 5 {
@@ -195,7 +200,6 @@ func TestParseConfig_ShortFlags(t *testing.T) {
 		"-u", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"-i", "test-signal-123",
 		"-e", "echo hello",
-		"-v",
 	}
 
 	cfg, err := ParseConfig()
@@ -215,9 +219,6 @@ func TestParseConfig_ShortFlags(t *testing.T) {
 		t.Errorf("Expected Exec to be set correctly with short flag, got: %s", cfg.Exec)
 	}
 
-	if !cfg.Verbose {
-		t.Error("Expected Verbose to be true with short flag")
-	}
 }
 
 func TestParseConfig_Defaults(t *testing.T) {
@@ -252,7 +253,11 @@ func TestParseConfig_Defaults(t *testing.T) {
 		t.Errorf("Expected default Timeout to be 30s, got: %v", cfg.Timeout)
 	}
 
-	if cfg.Verbose {
-		t.Error("Expected default Verbose to be false")
+	if cfg.LogLevel != "info" {
+		t.Errorf("Expected default LogLevel to be info, got: %s", cfg.LogLevel)
+	}
+
+	if cfg.LogFormat != "console" {
+		t.Errorf("Expected default LogFormat to be console, got: %s", cfg.LogFormat)
 	}
 }

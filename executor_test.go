@@ -5,8 +5,14 @@ import (
 	"testing"
 )
 
+// Helper function to create a test logger
+func createTestLogger() Logger {
+	logger, _ := NewLogger("console", "error") // Use error level to keep tests quiet
+	return logger
+}
+
 func TestDefaultExecutor_Success(t *testing.T) {
-	executor := NewDefaultExecutor(false)
+	executor := NewDefaultExecutor(createTestLogger())
 
 	// Test with success.sh fixture
 	exitCode, err := executor.Run("./test/fixtures/success.sh")
@@ -20,7 +26,7 @@ func TestDefaultExecutor_Success(t *testing.T) {
 }
 
 func TestDefaultExecutor_Failure(t *testing.T) {
-	executor := NewDefaultExecutor(false)
+	executor := NewDefaultExecutor(createTestLogger())
 
 	// Test with fail.sh fixture
 	exitCode, err := executor.Run("./test/fixtures/fail.sh")
@@ -34,7 +40,7 @@ func TestDefaultExecutor_Failure(t *testing.T) {
 }
 
 func TestDefaultExecutor_InvalidCommand(t *testing.T) {
-	executor := NewDefaultExecutor(false)
+	executor := NewDefaultExecutor(createTestLogger())
 
 	// Test with non-existent command
 	exitCode, err := executor.Run("this-command-does-not-exist-12345")
@@ -52,7 +58,7 @@ func TestDefaultExecutor_InvalidCommand(t *testing.T) {
 
 func TestDefaultExecutor_Verbose(t *testing.T) {
 	// Test that verbose mode doesn't break execution
-	executor := NewDefaultExecutor(true)
+	executor := NewDefaultExecutor(createTestLogger())
 
 	exitCode, err := executor.Run("echo 'verbose test'")
 	if err != nil {
@@ -65,7 +71,7 @@ func TestDefaultExecutor_Verbose(t *testing.T) {
 }
 
 func TestDefaultExecutor_ExitCodeHandling(t *testing.T) {
-	executor := NewDefaultExecutor(false)
+	executor := NewDefaultExecutor(createTestLogger())
 
 	testCases := []struct {
 		name         string

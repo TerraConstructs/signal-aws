@@ -283,13 +283,13 @@ func TestPublishInput_Struct(t *testing.T) {
 // Integration tests will use mocks to verify the SQS message format.
 func TestSQSPublisher_Creation(t *testing.T) {
 	// Test that we can create an SQSPublisher instance
-	publisher := NewSQSPublisher(false)
+	publisher := NewSQSPublisher(createTestLogger())
 	if publisher == nil {
 		t.Error("Expected SQSPublisher instance, got nil")
 	}
 
 	// Test with verbose mode
-	verbosePublisher := NewSQSPublisher(true)
+	verbosePublisher := NewSQSPublisher(createTestLogger())
 	if verbosePublisher == nil {
 		t.Error("Expected verbose SQSPublisher instance, got nil")
 	}

@@ -75,11 +75,11 @@ resource "tconsaws_signal" "web_ready" {
 - **AWS Integration**: IMDS instance ID fetching + SQS publishing
 - **Error Handling**: Proper exit codes (0=success, 1=child failed, 2=publish failed)
 - **Testing**: Comprehensive mock-based testing covering all scenarios
+- **Retry Logic**: Configurable retries with exponential backoff
+- **Structured Logging**: JSON/console format with observability integration
+- **Integration Testing**: Local ElasticMQ testing setup
 
 ### 🔄 Phase 2 (Planned)
-- **Retry Logic**: Configurable retries with exponential backoff
-- **Structured Logging**: JSON/text format with observability integration
-- **Integration Testing**: Local ElasticMQ testing setup
 - **Enhanced Timeouts**: Per-operation and overall timeout controls
 
 ## CLI Reference
@@ -93,10 +93,11 @@ FLAGS:
   -i, --id string            (required) unique signal ID for the deployment
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
-  -v, --verbose bool         basic log verbosity
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)
+  --log-format string        log format: json or console (default "console")
+  --log-level string         log level: debug, info, warn, or error (default "info")
   --help                     show usage
 ```
 

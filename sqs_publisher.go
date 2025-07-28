@@ -2,22 +2,22 @@ package signal
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"go.uber.org/zap"
 )
 
 type SQSPublisher struct {
-	Verbose bool
+	Logger Logger
 }
 
-func NewSQSPublisher(verbose bool) *SQSPublisher {
+func NewSQSPublisher(logger Logger) *SQSPublisher {
 	return &SQSPublisher{
-		Verbose: verbose,
+		Logger: logger,
 	}
 }
 
@@ -62,15 +62,19 @@ func (p *SQSPublisher) Publish(ctx context.Context, input PublishInput) error {
 
 	result, err := client.SendMessage(publishCtx, sqsInput)
 	if err != nil {
-		if p.Verbose {
-			log.Printf("Failed to send SQS message after %d retries: %v", input.Retries, err)
-		}
+		p.Logger.Error("Failed to send SQS message",
+			zap.Int("retries", input.Retries),
+			zap.String("signal_id", input.SignalID),
+			zap.String("instance_id", input.InstanceID),
+			zap.Error(err))
 		return err
 	}
 
-	if p.Verbose {
-		log.Printf("SQS message sent successfully, MessageId: %s", *result.MessageId)
-	}
+	p.Logger.Info("SQS message sent successfully",
+		zap.String("message_id", *result.MessageId),
+		zap.String("signal_id", input.SignalID),
+		zap.String("instance_id", input.InstanceID),
+		zap.String("status", input.Status))
 
 	return nil
 }

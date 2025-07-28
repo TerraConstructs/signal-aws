@@ -11,6 +11,12 @@ import (
 	"github.com/terraconstructs/tcons-signal"
 )
 
+// Helper function to create a test logger
+func createTestLogger() signal.Logger {
+	logger, _ := signal.NewLogger("console", "error") // Use error level to keep tests quiet
+	return logger
+}
+
 // TestBinaryExists ensures the binary can be built and shows help
 func TestBinaryExists(t *testing.T) {
 	// Test that the binary can be built
@@ -72,14 +78,13 @@ func TestRun_ExecSuccess(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-123",
 		Exec:           "../test/fixtures/success.sh",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err != nil {
 		t.Fatalf("Expected no error for exec success, got: %v", err)
 	}
@@ -149,14 +154,13 @@ func TestRun_ExplicitFailure(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-456",
 		Status:         "FAILURE", // Explicit status
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err != nil {
 		t.Fatalf("Expected no error for explicit failure, got: %v", err)
 	}
@@ -207,14 +211,13 @@ func TestRun_ExecFailure(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-789",
 		Exec:           "../test/fixtures/fail.sh",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err != nil {
 		t.Fatalf("Expected no error for exec failure, got: %v", err)
 	}
@@ -271,14 +274,13 @@ func TestRun_RetryOnTempError(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-retry",
 		Exec:           "echo success",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function - this should trigger retry logic in the SQS publisher
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 
 	// With AWS SDK retry approach, the mock publisher will fail on first attempt
 	// The retry logic is handled internally by AWS SDK, so we expect failure here
@@ -342,14 +344,13 @@ func TestRun_PublishTimeout(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-timeout",
 		Exec:           "echo success",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 1 * time.Millisecond, // Very short timeout
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err == nil {
 		t.Fatal("Expected error for publish timeout, got nil")
 	}
@@ -387,14 +388,13 @@ func TestRun_MissingFlags(t *testing.T) {
 	cfg := signal.Config{
 		// Missing QueueURL and ID
 		Exec:           "echo test",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run should succeed but try to publish to empty queue URL which should fail
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 
 	// The validation mainly happens in ParseConfig, but run() will try to publish with empty QueueURL
 	// This should be handled gracefully. For now, let's verify the behavior
@@ -432,14 +432,13 @@ func TestRun_InvalidExec(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		ID:             "test-signal-invalid",
 		Exec:           "this-command-does-not-exist",
-		Verbose:        false,
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err != nil {
 		t.Fatalf("Expected no error (should send FAILURE status), got: %v", err)
 	}
@@ -491,14 +490,13 @@ func TestRun_MockIntegration(t *testing.T) {
 		QueueURL:       "https://sqs.us-east-1.amazonaws.com/123456789012/mock-queue",
 		ID:             "mock-signal-123",
 		Exec:           "echo mock test",
-		Verbose:        true, // Test verbose mode
 		Retries:        3,
 		PublishTimeout: 10 * time.Second,
 		Timeout:        30 * time.Second,
 	}
 
 	// Run the function
-	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS)
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
 	if err != nil {
 		t.Fatalf("Expected no error for mock integration, got: %v", err)
 	}

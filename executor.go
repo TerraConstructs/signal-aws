@@ -1,9 +1,10 @@
 package signal
 
 import (
-	"log"
 	"os"
 	"os/exec"
+
+	"go.uber.org/zap"
 )
 
 type Executor interface {
@@ -11,19 +12,17 @@ type Executor interface {
 }
 
 type DefaultExecutor struct {
-	Verbose bool
+	Logger Logger
 }
 
-func NewDefaultExecutor(verbose bool) *DefaultExecutor {
+func NewDefaultExecutor(logger Logger) *DefaultExecutor {
 	return &DefaultExecutor{
-		Verbose: verbose,
+		Logger: logger,
 	}
 }
 
 func (e *DefaultExecutor) Run(cmdLine string) (int, error) {
-	if e.Verbose {
-		log.Printf("Executing command: %s", cmdLine)
-	}
+	e.Logger.Debug("Executing command", zap.String("command", cmdLine))
 
 	cmd := exec.Command("sh", "-c", cmdLine)
 	cmd.Stdout = os.Stdout
