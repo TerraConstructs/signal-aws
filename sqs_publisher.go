@@ -22,15 +22,22 @@ func NewSQSPublisher(logger Logger) *SQSPublisher {
 }
 
 func (p *SQSPublisher) Publish(ctx context.Context, input PublishInput) error {
-	// Configure AWS SDK with custom retry settings
-	awsCfg, err := config.LoadDefaultConfig(ctx,
+	// Configure AWS SDK with custom retry settings and region
+	configOptions := []func(*config.LoadOptions) error{
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(
 				retry.NewStandard(),
 				input.Retries+1, // +1 because AWS counts attempts, not retries
 			)
 		}),
-	)
+	}
+
+	// Add region configuration if provided
+	if input.Region != "" {
+		configOptions = append(configOptions, config.WithRegion(input.Region))
+	}
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, configOptions...)
 	if err != nil {
 		return err
 	}

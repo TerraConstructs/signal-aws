@@ -137,17 +137,20 @@ func (m *MockPublisher) GetLastCall() *PublishInput {
 	return &m.calls[len(m.calls)-1]
 }
 
-// MockIMDSClient for testing instance ID fetching
+// MockIMDSClient for testing instance ID and region fetching
 type MockIMDSClient struct {
-	mu         sync.Mutex
-	instanceID string
-	err        error
-	callCount  int
+	mu              sync.Mutex
+	instanceID      string
+	region          string
+	instanceIDError error
+	regionError     error
+	callCount       int
 }
 
 func NewMockIMDSClient() *MockIMDSClient {
 	return &MockIMDSClient{
 		instanceID: "i-1234567890abcdef0", // Default fake instance ID
+		region:     "us-east-1",           // Default fake region
 	}
 }
 
@@ -157,10 +160,22 @@ func (m *MockIMDSClient) SetInstanceID(id string) {
 	m.instanceID = id
 }
 
-func (m *MockIMDSClient) SetError(err error) {
+func (m *MockIMDSClient) SetRegion(region string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.err = err
+	m.region = region
+}
+
+func (m *MockIMDSClient) SetInstanceIDError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.instanceIDError = err
+}
+
+func (m *MockIMDSClient) SetRegionError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.regionError = err
 }
 
 func (m *MockIMDSClient) GetInstanceID(ctx context.Context) (string, error) {
@@ -168,7 +183,21 @@ func (m *MockIMDSClient) GetInstanceID(ctx context.Context) (string, error) {
 	defer m.mu.Unlock()
 
 	m.callCount++
-	return m.instanceID, m.err
+	if m.instanceIDError != nil {
+		return "", m.instanceIDError
+	}
+	return m.instanceID, nil
+}
+
+func (m *MockIMDSClient) GetRegion(ctx context.Context) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.callCount++
+	if m.regionError != nil {
+		return "", m.regionError
+	}
+	return m.region, nil
 }
 
 func (m *MockIMDSClient) CallCount() int {

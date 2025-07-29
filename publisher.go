@@ -10,6 +10,7 @@ type PublishInput struct {
 	SignalID       string
 	InstanceID     string
 	Status         string
+	Region         string
 	PublishTimeout time.Duration
 	Retries        int
 }

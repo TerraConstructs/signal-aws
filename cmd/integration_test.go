@@ -245,9 +245,9 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 	queueURL := getQueueURL(t, testQueueName)
 	purgeQueue(t, queueURL)
 
-	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+	// Build the binary if it doesn't exist in root directory
+	if _, err := os.Stat("../tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "../tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
@@ -255,7 +255,7 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 
 	// Test 1: Run without IMDS and without --instance-id (should fail)
 	t.Log("🔄 Testing binary without IMDS and without --instance-id (expected to fail)...")
-	cmd1 := exec.Command("./tcsignal-aws",
+	cmd1 := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "integration-binary-test-no-imds-no-flag",
 		"--status", "SUCCESS",
@@ -286,7 +286,7 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 	} else {
 		// If it succeeded, it means IMDS mock was accessible (which is fine in integration environment)
 		t.Log("✅ Binary succeeded - IMDS mock was accessible (this is fine in integration environment)")
-		
+
 		// Verify it used an instance ID from IMDS
 		outputStr := string(output1)
 		if contains(outputStr, "Fetched instance ID from IMDS") {
@@ -297,8 +297,8 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 	// Test 2: Run without IMDS but WITH --instance-id (should succeed)
 	t.Log("🔄 Testing binary without IMDS but with --instance-id (should succeed)...")
 	providedInstanceID := "i-no-imds-workaround-789"
-	
-	cmd2 := exec.Command("./tcsignal-aws",
+
+	cmd2 := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "integration-binary-test-no-imds-with-flag",
 		"--status", "SUCCESS",
@@ -326,7 +326,7 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 
 	// Verify the message was published correctly
 	messages := receiveMessages(t, queueURL, 10)
-	
+
 	// Should have 1 message (the successful one with --instance-id flag)
 	successMessages := 0
 	for _, msg := range messages {
@@ -334,7 +334,7 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 			signalID.StringValue != nil &&
 			*signalID.StringValue == "integration-binary-test-no-imds-with-flag" {
 			successMessages++
-			
+
 			// Verify it has the correct instance ID
 			if instanceID, exists := msg.MessageAttributes["instance_id"]; exists &&
 				instanceID.StringValue != nil &&
@@ -345,7 +345,7 @@ func TestBinary_Integration_WithElasticMQ_NoIMDS(t *testing.T) {
 			}
 		}
 	}
-	
+
 	if successMessages != 1 {
 		t.Errorf("Expected 1 successful message, found %d", successMessages)
 	}
@@ -369,16 +369,16 @@ func TestBinary_Integration_WithIMDSMock(t *testing.T) {
 	queueURL := getQueueURL(t, testQueueName)
 	purgeQueue(t, queueURL)
 
-	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+	// Build the binary if it doesn't exist in root directory
+	if _, err := os.Stat("../tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "../tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
 	}
 
 	// Run the binary with both ElasticMQ and IMDS mock
-	cmd := exec.Command("./tcsignal-aws",
+	cmd := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "integration-binary-test-with-imds",
 		"--exec", "../test/fixtures/success.sh",
@@ -448,9 +448,9 @@ func TestBinary_Integration_WithProvidedInstanceID(t *testing.T) {
 	queueURL := getQueueURL(t, testQueueName)
 	purgeQueue(t, queueURL)
 
-	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+	// Build the binary if it doesn't exist in root directory
+	if _, err := os.Stat("../tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "../tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
@@ -459,7 +459,7 @@ func TestBinary_Integration_WithProvidedInstanceID(t *testing.T) {
 	providedInstanceID := "i-provided-integration-test-123"
 
 	// Run the binary with provided instance ID (bypassing IMDS)
-	cmd := exec.Command("./tcsignal-aws",
+	cmd := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "integration-binary-test-provided-instance-id",
 		"--exec", "../test/fixtures/success.sh",
@@ -545,9 +545,9 @@ func TestBinary_Integration_ProvidedInstanceID_vs_IMDS(t *testing.T) {
 	queueURL := getQueueURL(t, testQueueName)
 	purgeQueue(t, queueURL)
 
-	// Build the binary if it doesn't exist
-	if _, err := os.Stat("tcsignal-aws"); os.IsNotExist(err) {
-		cmd := exec.Command("go", "build", "-o", "tcsignal-aws", ".")
+	// Build the binary if it doesn't exist in root directory
+	if _, err := os.Stat("../tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "../tcsignal-aws", ".")
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("Failed to build binary: %v", err)
 		}
@@ -557,7 +557,7 @@ func TestBinary_Integration_ProvidedInstanceID_vs_IMDS(t *testing.T) {
 
 	// Test 1: Run with provided instance ID
 	t.Log("🔄 Testing binary with provided instance ID...")
-	cmd1 := exec.Command("./tcsignal-aws",
+	cmd1 := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "comparison-test-provided-id",
 		"--status", "SUCCESS",
@@ -581,7 +581,7 @@ func TestBinary_Integration_ProvidedInstanceID_vs_IMDS(t *testing.T) {
 
 	// Test 2: Run with IMDS (different signal ID to avoid conflicts)
 	t.Log("🔄 Testing binary with IMDS...")
-	cmd2 := exec.Command("./tcsignal-aws",
+	cmd2 := exec.Command("../tcsignal-aws",
 		"--queue-url", queueURL,
 		"--id", "comparison-test-imds-id",
 		"--status", "SUCCESS",
@@ -697,6 +697,98 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestBinary_Integration_IMDSRegionDetection(t *testing.T) {
+	// Check if EC2 metadata mock is available
+	if !isEC2MockAvailable() {
+		t.Skip("EC2 metadata mock not available - run 'make integration-up' first")
+	}
+
+	queueURL := getQueueURL(t, testQueueName)
+	purgeQueue(t, queueURL)
+
+	// Build the binary if it doesn't exist in root directory
+	if _, err := os.Stat("../tcsignal-aws"); os.IsNotExist(err) {
+		cmd := exec.Command("go", "build", "-o", "../tcsignal-aws", ".")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to build binary: %v", err)
+		}
+	}
+
+	// Run the binary WITHOUT --region flag to test IMDS region detection
+	cmd := exec.Command("../tcsignal-aws",
+		"--queue-url", queueURL,
+		"--id", "integration-test-imds-region-detection",
+		"--status", "SUCCESS",
+		"--log-level", "debug",
+	)
+
+	// Set environment variables for AWS configuration with IMDS mock
+	cmd.Env = append(os.Environ(),
+		"AWS_EC2_METADATA_SERVICE_ENDPOINT=http://localhost:1338",
+		"AWS_ENDPOINT_URL_SQS=http://localhost:9324",
+		"AWS_ACCESS_KEY_ID=test",
+		"AWS_SECRET_ACCESS_KEY=test",
+		// Explicitly DO NOT set AWS_REGION to force IMDS region detection
+	)
+
+	output, err := cmd.CombinedOutput()
+	t.Logf("Binary output: %s", string(output))
+
+	if err != nil {
+		t.Errorf("Binary execution failed: %v", err)
+		t.Errorf("Output: %s", string(output))
+		return
+	}
+
+	t.Log("✅ Binary executed successfully with IMDS region detection!")
+
+	// Verify the log output shows it fetched region from IMDS
+	outputStr := string(output)
+	if contains(outputStr, "Fetched region from IMDS") {
+		t.Log("✅ Binary logged that it fetched region from IMDS")
+	} else {
+		t.Error("Binary should have logged fetching region from IMDS")
+	}
+
+	// Check if message was published to SQS
+	messages := receiveMessages(t, queueURL, 10)
+	if len(messages) == 0 {
+		t.Fatal("No messages found in SQS queue - signal was not published")
+	}
+
+	t.Logf("✅ Found %d message(s) in SQS queue", len(messages))
+
+	msg := messages[0]
+	t.Logf("Message attributes: %+v", msg.MessageAttributes)
+
+	// Verify expected attributes
+	if signalID, exists := msg.MessageAttributes["signal_id"]; exists &&
+		signalID.StringValue != nil &&
+		*signalID.StringValue == "integration-test-imds-region-detection" {
+		t.Log("✅ Signal ID matches expected value")
+	} else {
+		t.Errorf("Expected signal_id 'integration-test-imds-region-detection', got %v", msg.MessageAttributes["signal_id"])
+	}
+
+	if status, exists := msg.MessageAttributes["status"]; exists &&
+		status.StringValue != nil &&
+		*status.StringValue == "SUCCESS" {
+		t.Log("✅ Status matches expected value (SUCCESS)")
+	} else {
+		t.Errorf("Expected status 'SUCCESS', got %v", msg.MessageAttributes["status"])
+	}
+
+	// Verify instance ID is from IMDS
+	if instanceID, exists := msg.MessageAttributes["instance_id"]; exists &&
+		instanceID.StringValue != nil {
+		t.Logf("✅ Instance ID from IMDS: %s", *instanceID.StringValue)
+	} else {
+		t.Error("Expected instance_id attribute from IMDS")
+	}
+
+	t.Log("🎉 IMDS region detection integration test completed successfully!")
 }
 
 func TestElasticMQ_QueueSetup(t *testing.T) {

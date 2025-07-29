@@ -97,12 +97,30 @@ func run(ctx context.Context, cfg signal.Config, executor signal.Executor, publi
 		logger.Debug("Fetched instance ID from IMDS", zap.String("instance_id", instanceID))
 	}
 
+	// Resolve region - use provided value, fallback to IMDS, then AWS config
+	var region string
+	if cfg.Region != "" {
+		region = cfg.Region
+		logger.Debug("Using provided region", zap.String("region", region))
+	} else {
+		// Try to get region from IMDS first
+		var err error
+		region, err = imdsClient.GetRegion(ctx)
+		if err != nil {
+			logger.Debug("Failed to get region from IMDS, falling back to AWS config", zap.Error(err))
+			// Region will be empty, let AWS SDK handle default resolution
+		} else {
+			logger.Debug("Fetched region from IMDS", zap.String("region", region))
+		}
+	}
+
 	// Publish signal
 	publishInput := signal.PublishInput{
 		QueueURL:       cfg.QueueURL,
 		SignalID:       cfg.ID,
 		InstanceID:     instanceID,
 		Status:         status,
+		Region:         region,
 		PublishTimeout: cfg.PublishTimeout,
 		Retries:        cfg.Retries,
 	}

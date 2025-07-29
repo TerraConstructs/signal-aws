@@ -508,9 +508,9 @@ func TestRun_ProvidedInstanceID(t *testing.T) {
 		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
 	}
 
-	// Verify IMDS was NOT called
-	if mockIMDS.CallCount() != 0 {
-		t.Errorf("Expected IMDS NOT to be called when instance ID provided, got: %d calls", mockIMDS.CallCount())
+	// Verify IMDS was called only once for region (not for instance ID)
+	if mockIMDS.CallCount() != 1 {
+		t.Errorf("Expected IMDS to be called once for region when instance ID provided, got: %d calls", mockIMDS.CallCount())
 	}
 
 	// Verify executor was called
@@ -571,9 +571,9 @@ func TestRun_IMDSUsedWhenNoInstanceIDProvided(t *testing.T) {
 		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
 	}
 
-	// Verify IMDS WAS called
-	if mockIMDS.CallCount() != 1 {
-		t.Errorf("Expected IMDS to be called once when no instance ID provided, got: %d calls", mockIMDS.CallCount())
+	// Verify IMDS WAS called for both instance ID and region
+	if mockIMDS.CallCount() != 2 {
+		t.Errorf("Expected IMDS to be called twice when no instance ID or region provided, got: %d calls", mockIMDS.CallCount())
 	}
 
 	// Verify publisher was called with IMDS instance ID
@@ -635,8 +635,8 @@ func TestRun_MockIntegration(t *testing.T) {
 		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
 	}
 
-	if mockIMDS.CallCount() != 1 {
-		t.Errorf("Expected IMDS to be called once, got: %d", mockIMDS.CallCount())
+	if mockIMDS.CallCount() != 2 {
+		t.Errorf("Expected IMDS to be called twice (instance ID + region), got: %d", mockIMDS.CallCount())
 	}
 
 	// Verify publish input has all required fields
@@ -659,5 +659,248 @@ func TestRun_MockIntegration(t *testing.T) {
 	}
 	if lastCall.PublishTimeout == 0 {
 		t.Error("Expected non-zero PublishTimeout")
+	}
+}
+
+// Test region resolution: provided region flag is used
+func TestRun_ProvidedRegion(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	mockIMDS.SetInstanceID("i-test123456789abcdef")
+	// IMDS region should NOT be called when region is provided
+
+	// Create config with provided region
+	providedRegion := "us-west-2"
+	cfg := signal.Config{
+		QueueURL:       "https://sqs.us-west-2.amazonaws.com/123456789012/test-queue",
+		ID:             "test-signal-provided-region",
+		Exec:           "echo success",
+		Region:         providedRegion, // Provide region directly
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for provided region, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS was called only once for instance ID (not for region)
+	if mockIMDS.CallCount() != 1 {
+		t.Errorf("Expected IMDS to be called once for instance ID only, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify publisher was called with provided region
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.Region != providedRegion {
+		t.Errorf("Expected region '%s', got: %s", providedRegion, lastCall.Region)
+	}
+
+	if lastCall.Status != "SUCCESS" {
+		t.Errorf("Expected status 'SUCCESS', got: %s", lastCall.Status)
+	}
+}
+
+// Test region resolution: IMDS region is used when no region provided
+func TestRun_IMDSRegionUsed(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	imdsInstanceID := "i-imds123456789abcdef"
+	imdsRegion := "eu-west-1"
+	mockIMDS.SetInstanceID(imdsInstanceID)
+	mockIMDS.SetRegion(imdsRegion)
+
+	// Create config WITHOUT provided region
+	cfg := signal.Config{
+		QueueURL: "https://sqs.eu-west-1.amazonaws.com/123456789012/test-queue",
+		ID:       "test-signal-imds-region",
+		Exec:     "echo success",
+		// Region is empty - should use IMDS
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for IMDS region usage, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS was called twice (instance ID + region)
+	if mockIMDS.CallCount() != 2 {
+		t.Errorf("Expected IMDS to be called twice when no region provided, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify publisher was called with IMDS region
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.Region != imdsRegion {
+		t.Errorf("Expected region from IMDS '%s', got: %s", imdsRegion, lastCall.Region)
+	}
+
+	if lastCall.InstanceID != imdsInstanceID {
+		t.Errorf("Expected instance ID from IMDS '%s', got: %s", imdsInstanceID, lastCall.InstanceID)
+	}
+}
+
+// Test region resolution: IMDS region fails, falls back to empty (AWS SDK handles)
+func TestRun_IMDSRegionFallsBackOnError(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	imdsInstanceID := "i-imds123456789abcdef"
+	mockIMDS.SetInstanceID(imdsInstanceID)
+	// Set IMDS region to fail
+	mockIMDS.SetRegionError(fmt.Errorf("IMDS region fetch failed"))
+
+	// Create config WITHOUT provided region
+	cfg := signal.Config{
+		QueueURL: "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+		ID:       "test-signal-region-fallback",
+		Exec:     "echo success",
+		// Region is empty and IMDS will fail - should fallback to AWS SDK
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for IMDS region fallback, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS was called twice (instance ID + region attempt)
+	if mockIMDS.CallCount() != 2 {
+		t.Errorf("Expected IMDS to be called twice when region fetch fails, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify publisher was called with empty region (fallback to AWS SDK)
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.Region != "" {
+		t.Errorf("Expected empty region for fallback, got: %s", lastCall.Region)
+	}
+
+	if lastCall.InstanceID != imdsInstanceID {
+		t.Errorf("Expected instance ID from IMDS '%s', got: %s", imdsInstanceID, lastCall.InstanceID)
+	}
+}
+
+// Test region resolution with both provided region and instance ID
+func TestRun_ProvidedRegionAndInstanceID(t *testing.T) {
+	// Create mocks
+	mockExecutor := signal.NewMockExecutor()
+	mockPublisher := signal.NewMockPublisher()
+	mockIMDS := signal.NewMockIMDSClient()
+
+	// Setup mocks
+	mockExecutor.SetExitCode(0)
+	// IMDS should not be called at all
+
+	// Create config with both provided
+	providedRegion := "ap-southeast-1"
+	providedInstanceID := "i-provided123456789"
+	cfg := signal.Config{
+		QueueURL:       "https://sqs.ap-southeast-1.amazonaws.com/123456789012/test-queue",
+		ID:             "test-signal-both-provided",
+		Exec:           "echo success",
+		Region:         providedRegion,
+		InstanceID:     providedInstanceID,
+		Retries:        3,
+		PublishTimeout: 10 * time.Second,
+		Timeout:        30 * time.Second,
+	}
+
+	// Run the function
+	result, err := run(context.Background(), cfg, mockExecutor, mockPublisher, mockIMDS, createTestLogger())
+	if err != nil {
+		t.Fatalf("Expected no error for both provided, got: %v", err)
+	}
+
+	// Verify result
+	if result.Status != "SUCCESS" {
+		t.Errorf("Expected result status 'SUCCESS', got: %s", result.Status)
+	}
+
+	// Verify IMDS was NOT called at all
+	if mockIMDS.CallCount() != 0 {
+		t.Errorf("Expected IMDS NOT to be called when both region and instance ID provided, got: %d calls", mockIMDS.CallCount())
+	}
+
+	// Verify publisher was called with provided values
+	if mockPublisher.CallCount() != 1 {
+		t.Errorf("Expected publisher to be called once, got: %d", mockPublisher.CallCount())
+	}
+
+	lastCall := mockPublisher.GetLastCall()
+	if lastCall == nil {
+		t.Fatal("Expected publisher call to be recorded")
+	}
+
+	if lastCall.Region != providedRegion {
+		t.Errorf("Expected region '%s', got: %s", providedRegion, lastCall.Region)
+	}
+
+	if lastCall.InstanceID != providedInstanceID {
+		t.Errorf("Expected instance ID '%s', got: %s", providedInstanceID, lastCall.InstanceID)
+	}
+
+	if lastCall.Status != "SUCCESS" {
+		t.Errorf("Expected status 'SUCCESS', got: %s", lastCall.Status)
 	}
 }
