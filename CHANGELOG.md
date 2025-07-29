@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/TerraConstructs/signal-aws/compare/v1.0.0...v1.1.0) (2025-07-29)
+
+
+### Features
+
+* Flag for region and autodetect Instance Region feature ([a3370ad](https://github.com/TerraConstructs/signal-aws/commit/a3370add4dab81864965a5f16ed00a2e5a965dec))
+* Flag for region and autodetect Instance Region feature ([303803d](https://github.com/TerraConstructs/signal-aws/commit/303803d13e159bf97a5058dd8c78def8ce2b2876))
+
 ## 1.0.0 (2025-07-28)
 
 
