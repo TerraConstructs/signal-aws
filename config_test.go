@@ -25,6 +25,7 @@ func TestParseConfig_Success(t *testing.T) {
 		"--retries", "5",
 		"--publish-timeout", "15s",
 		"--timeout", "60s",
+		"--region", "us-east-1",
 	}
 
 	cfg, err := ParseConfig()
@@ -62,6 +63,10 @@ func TestParseConfig_Success(t *testing.T) {
 
 	if cfg.Timeout != 60*time.Second {
 		t.Errorf("Expected Timeout to be 60s, got: %v", cfg.Timeout)
+	}
+
+	if cfg.Region != "us-east-1" {
+		t.Errorf("Expected Region to be us-east-1, got: %s", cfg.Region)
 	}
 }
 
@@ -200,6 +205,7 @@ func TestParseConfig_ShortFlags(t *testing.T) {
 		"-u", "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
 		"-i", "test-signal-123",
 		"-e", "echo hello",
+		"-r", "us-east-1",
 	}
 
 	cfg, err := ParseConfig()
@@ -217,6 +223,10 @@ func TestParseConfig_ShortFlags(t *testing.T) {
 
 	if cfg.Exec != "echo hello" {
 		t.Errorf("Expected Exec to be set correctly with short flag, got: %s", cfg.Exec)
+	}
+
+	if cfg.Region != "us-east-1" {
+		t.Errorf("Expected Region to be set correctly with short flag, got: %s", cfg.Region)
 	}
 
 }

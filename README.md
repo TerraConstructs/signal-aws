@@ -37,6 +37,12 @@ tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue 
 tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
              --id deployment-123 \
              --status SUCCESS
+
+# Specify region explicitly (useful for cross-region deployments)
+tcsignal-aws --queue-url https://sqs.eu-west-1.amazonaws.com/123456789/my-queue \
+             --id deployment-123 \
+             --region eu-west-1 \
+             --status SUCCESS
 ```
 
 ### Terraform Integration Example
@@ -73,7 +79,7 @@ resource "tconsaws_signal" "web_ready" {
 
 - **CLI Interface**: Full flag parsing with validation
 - **Command Execution**: Wraps user commands and captures exit codes  
-- **AWS Integration**: IMDS instance ID fetching + SQS publishing
+- **AWS Integration**: IMDS instance ID & region fetching + SQS publishing
 - **Error Handling**: Proper exit codes (0=success, 1=child failed, 2=publish failed)
 - **Testing**: Comprehensive mock-based testing covering all scenarios
 - **Retry Logic**: Configurable retries with exponential backoff
@@ -92,6 +98,7 @@ FLAGS:
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
   -n, --instance-id string   override instance ID (default: fetch from IMDS)
+  -r, --region string        AWS region (default: fetch from IMDS or AWS config)
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)
@@ -100,24 +107,66 @@ FLAGS:
   --help                     show usage
 ```
 
+## AWS Region Configuration
+
+`tcsignal-aws` automatically handles AWS region detection through a fallback chain:
+
+1. **Explicit Flag**: `--region` / `-r` flag takes highest precedence
+2. **IMDS Detection**: Fetches region from EC2 Instance Metadata Service
+3. **AWS SDK Default**: Falls back to standard AWS SDK region resolution (env vars, config files, etc.)
+
+### Region Resolution Examples
+
+```bash
+# Explicit region (highest priority)
+tcsignal-aws --region us-west-2 --queue-url [...] --id [...] --status SUCCESS
+
+# Auto-detect from IMDS (works on EC2 instances)
+tcsignal-aws --queue-url [...] --id [...] --status SUCCESS
+
+# Using environment variable (AWS SDK fallback)
+export AWS_REGION=eu-central-1
+tcsignal-aws --queue-url [...] --id [...] --status SUCCESS
+```
+
+**When to use explicit region:**
+- Cross-region deployments (queue in different region than EC2 instance)
+- Local testing environments
+- When IMDS is unavailable or unreliable
+
+**IMDS region detection:**
+- Automatically works on EC2 instances
+- No configuration required
+- Matches the instance's actual region
+- Falls back gracefully if IMDS is unavailable
+
 ## Local Testing & Development
 
 ### Testing Without EC2/IMDS
 
-When developing or testing outside of EC2 environments, use the `--instance-id` flag to bypass IMDS:
+When developing or testing outside of EC2 environments, use the `--instance-id` and optionally `--region` flags to bypass IMDS:
 
 ```bash
 # Test locally without IMDS dependency
 tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
              --id test-signal-123 \
              --status SUCCESS \
-             --instance-id i-local-test-12345
+             --instance-id i-local-test-12345 \
+             --region us-east-1
 
 # Test with command execution
 tcsignal-aws --queue-url https://sqs.us-east-1.amazonaws.com/123456789/my-queue \
              --id test-signal-456 \
              --exec "./my-test-script.sh" \
-             --instance-id i-local-test-67890
+             --instance-id i-local-test-67890 \
+             --region us-east-1
+
+# Test cross-region scenario
+tcsignal-aws --queue-url https://sqs.eu-west-1.amazonaws.com/123456789/my-queue \
+             --id test-signal-789 \
+             --status SUCCESS \
+             --instance-id i-local-test-cross \
+             --region eu-west-1
 ```
 
 ### Integration Testing

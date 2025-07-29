@@ -13,6 +13,7 @@ type Config struct {
 	Exec           string
 	Status         string
 	InstanceID     string
+	Region         string
 	Retries        int
 	PublishTimeout time.Duration
 	Timeout        time.Duration
@@ -33,6 +34,8 @@ func ParseConfig() (*Config, error) {
 	flag.StringVar(&cfg.Status, "s", "", "shortcut: send SUCCESS or FAILURE without exec")
 	flag.StringVar(&cfg.InstanceID, "instance-id", "", "override instance ID (default: fetch from IMDS)")
 	flag.StringVar(&cfg.InstanceID, "n", "", "override instance ID (default: fetch from IMDS)")
+	flag.StringVar(&cfg.Region, "region", "", "AWS region (default: fetch from IMDS or AWS config)")
+	flag.StringVar(&cfg.Region, "r", "", "AWS region (default: fetch from IMDS or AWS config)")
 	flag.IntVar(&cfg.Retries, "retries", 3, "transient-error retries")
 	flag.DurationVar(&cfg.PublishTimeout, "publish-timeout", 10*time.Second, "timeout per SendMessage")
 	flag.DurationVar(&cfg.Timeout, "timeout", 30*time.Second, "total operation timeout")
@@ -49,6 +52,7 @@ FLAGS:
   -e, --exec string          run this command and signal based on its exit code
   -s, --status string        shortcut: send "SUCCESS" or "FAILURE" without exec
   -n, --instance-id string   override instance ID (default: fetch from IMDS)
+  -r, --region string        AWS region (default: fetch from IMDS or AWS config)
   --retries int              transient-error retries (default 3)
   --publish-timeout duration timeout per SendMessage (default 10s)
   --timeout duration         total operation timeout (default 30s)
